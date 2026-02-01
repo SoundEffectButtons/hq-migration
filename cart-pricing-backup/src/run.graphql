@@ -1,0 +1,34 @@
+query RunInput {
+  cart {
+    buyerIdentity {
+      countryCode
+    }
+    lines {
+      id
+      quantity
+      cost {
+        amountPerQuantity {
+          currencyCode
+        }
+      }
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          id
+        }
+      }
+      areaX: attribute(key: "_Area_x") {
+        value
+      }
+      areaY: attribute(key: "_Area_y") {
+        value
+      }
+      preCut: attribute(key: "_PreCut") {
+        value
+      }
+      customImage: attribute(key: "CustomImage") {
+        value
+      }
+    }
+  }
+}

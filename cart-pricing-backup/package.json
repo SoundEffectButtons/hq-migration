@@ -1,0 +1,12 @@
+{
+  "name": "cart-pricing",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "shopify app function build",
+    "typegen": "shopify app function typegen"
+  },
+  "dependencies": {
+    "@shopify/shopify_function": "^2.0.0"
+  }
+}

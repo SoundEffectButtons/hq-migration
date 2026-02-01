@@ -1,0 +1,55 @@
+<div id="cloth-editor-app"
+     data-product-id="{{ product.id }}"
+     data-settings-url="/apps/customscale-app/product-settings?productId={{ product.id }}"
+     data-variant-id="{{ product.selected_or_first_available_variant.id }}"
+     data-hoodie="{{ 'hoodie.png' | asset_url }}"
+     data-cap="{{ 'cap.png' | asset_url }}"
+     data-tshirt="{{ 'tshirt.png' | asset_url }}"
+     data-shorts="{{ 'shorts.png' | asset_url }}"
+     data-polo="{{ 'polo.png' | asset_url }}"
+     data-apron="{{ 'apron.png' | asset_url }}"
+     data-front="{{ 'front-shirt.png' | asset_url }}"
+     data-back="{{ 'back-shirt.png' | asset_url }}"
+     data-side="{{ 'left-side-shirt.png' | asset_url }}">
+  <div style="padding: 40px; text-align: center; color: #6b7280;">
+    <div style="width: 40px; height: 40px; margin: 0 auto 16px; border: 3px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    <p>Loading editor...</p>
+  </div>
+</div>
+
+<style>
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .product-form__buttons,
+  .shopify-payment-button {
+    display: none !important;
+  }
+</style>
+
+<!-- Load React app from external CDN (Shopify has 10KB limit for inline JS) -->
+<link rel="stylesheet" href="{{ block.settings.editor_css_url }}">
+<script src="{{ block.settings.editor_js_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Cloth Editor",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "editor_js_url",
+      "label": "Editor JS URL",
+      "default": "https://shopify-ext.vercel.app/index.js",
+      "info": "URL to the React editor JavaScript bundle"
+    },
+    {
+      "type": "text",
+      "id": "editor_css_url",
+      "label": "Editor CSS URL", 
+      "default": "https://shopify-ext.vercel.app/index.css",
+      "info": "URL to the React editor CSS stylesheet"
+    }
+  ]
+}
+{% endschema %}

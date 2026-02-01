@@ -1,0 +1,13 @@
+api_version = "2024-04"
+name = "cart-pricing"
+uid = "30b30bed-683d-2dac-0933-3a1c35e2f3afab1b49f6"
+type = "function"
+
+[build]
+command = "npm exec -- shopify app function build"
+path = "dist/function.wasm"
+
+[[targeting]]
+target = "purchase.cart-transform.run"
+input_query = "src/run.graphql"
+export = "run"

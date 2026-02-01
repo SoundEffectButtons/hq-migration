@@ -1,0 +1,34 @@
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration
+# When running `shopify app dev`, the CLI will update application_url and
+# redirect_urls on Shopify to your tunnel URL (e.g. https://xxx.trycloudflare.com).
+
+client_id = "f1daef32f7052115a100cdb78ecdf791"
+name = "CustomScale-app"
+handle = "customscale-app"
+application_url = "https://intelligence-fossil-python-katie.trycloudflare.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[webhooks]
+api_version = "2025-01"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+[access_scopes]
+scopes = "write_products,write_app_proxy"
+
+[app_proxy]
+url = "/api"
+prefix = "apps"
+subpath = "customscale-app"
+
+[auth]
+redirect_urls = [ "https://intelligence-fossil-python-katie.trycloudflare.com/auth/callback" ]
