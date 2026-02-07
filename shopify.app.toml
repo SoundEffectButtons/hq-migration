@@ -22,8 +22,13 @@ api_version = "2025-01"
   topics = [ "app/uninstalled" ]
   uri = "/webhooks/app/uninstalled"
 
+  # orders/create contains protected customer data - uncomment after app approval for PCD, or when deploying
+  # [[webhooks.subscriptions]]
+  # topics = [ "orders/create" ]
+  # uri = "/webhooks/orders/create"
+
 [access_scopes]
-scopes = "write_products,write_app_proxy"
+scopes = "write_products,write_app_proxy,read_orders"
 
 [app_proxy]
 url = "/api"
