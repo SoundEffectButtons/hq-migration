@@ -66,6 +66,13 @@ This template comes pre-configured with examples of:
 2. Querying data using Graphql. Please see: [/app/routes/app.\_index.tsx](https://github.com/Shopify/shopify-app-template-react-router/blob/main/app/routes/app._index.tsx).
 3. Responding to webhooks. Please see [/app/routes/webhooks.tsx](https://github.com/Shopify/shopify-app-template-react-router/blob/main/app/routes/webhooks.app.uninstalled.tsx).
 
+### Order created: Webhook vs Shopify Flow
+
+The app can learn about new orders in two ways:
+
+- **Webhook** (`orders/create`): Subscribe in `shopify.app.toml`. Requires [protected customer data (PCD) approval](https://shopify.dev/docs/apps/launch/protected-customer-data) for dev and production.
+- **Shopify Flow** (no PCD subscription): Use **Order created** → **Send HTTP request** to `POST /api/flow/order-created` with body `{ "shop": "store.myshopify.com", "order": { "id", "line_items", ... } }`. Works on Plus/Advanced/Grow. Optional: set `FLOW_WEBHOOK_SECRET` in env and send it as `X-Flow-Secret` header. See [app/routes/api.flow.order-created.jsx](app/routes/api.flow.order-created.jsx) for details.
+
 Please read the [documentation for @shopify/shopify-app-react-router](https://shopify.dev/docs/api/shopify-app-react-router) to see what other API's are available.
 
 ## Shopify Dev MCP
