@@ -3,6 +3,7 @@ import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 
+
 const BACKEND_URL = "https://highquality.allgovjobs.com/backend";
 
 export const loader = async ({ request }) => {
@@ -15,6 +16,29 @@ export default function Index() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const backendUrl = BACKEND_URL;
+  const loaderStyles = `
+    .loader-container {
+      display: flex;
+      height: 100vh;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .spinner {
+      width: 45px;
+      height: 45px;
+      border: 4px solid #e3e3e3;
+      border-top: 4px solid #008060;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  `;
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -47,25 +71,15 @@ export default function Index() {
     checkAuth();
   }, [backendUrl, loaderShop]);
 
-  if (isCheckingAuth) {
+  if (isCheckingAuth || !isAuthorized) {
     return (
-      <div
-        style={{
-          display: "flex",
-          height: "100vh",
-          justifyContent: "center",
-          alignItems: "center",
-          fontSize: "18px",
-          fontWeight: "500",
-        }}
-      >
-        Loading authentication...
-      </div>
+      <>
+        <style>{loaderStyles}</style>
+        <div className="loader-container">
+          <div className="spinner"></div>
+        </div>
+      </>
     );
-  }
-
-  if (!isAuthorized) {
-    return <div>Not authorized</div>;
   }
 
   return (
