@@ -53,6 +53,9 @@ export default function Index() {
       fetch(`${backendUrl}/api/check-token?shop=${shop}`)
         .then((res) => res.json())
         .then((data) => {
+          console.log("Auth check response:", data);
+        })
+        .then((data) => {
           if (!data.authorized) {
             const installUrl = `${backendUrl}/shopify?shop=${shop}`;
             if (window.top !== window.self) {
