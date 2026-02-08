@@ -5,7 +5,7 @@
 client_id = "f1daef32f7052115a100cdb78ecdf791"
 name = "CustomScale-app"
 handle = "customscale-app"
-application_url = "https://intelligence-fossil-python-katie.trycloudflare.com"
+application_url = "https://highquality.allgovjobs.com"
 embedded = true
 
 [build]
@@ -28,7 +28,7 @@ api_version = "2025-01"
   # uri = "/webhooks/orders/create"
 
 [access_scopes]
-scopes = "write_products,write_app_proxy,read_orders"
+scopes = "write_products,write_orders,read_themes,read_orders,read_products"
 
 [app_proxy]
 url = "/api"
@@ -36,4 +36,4 @@ prefix = "apps"
 subpath = "customscale-app"
 
 [auth]
-redirect_urls = [ "https://intelligence-fossil-python-katie.trycloudflare.com/auth/callback" ]
+redirect_urls = [ "https://highquality.allgovjobs.com/backend/auth/callback" ]
