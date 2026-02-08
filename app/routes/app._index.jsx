@@ -1,7 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
+
+const BACKEND_URL = "https://highquality.allgovjobs.com/backend";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -9,25 +11,62 @@ export const loader = async ({ request }) => {
 };
 
 export default function Index() {
-  const { shop } = useLoaderData();
+  const { shop: loaderShop } = useLoaderData();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const backendUrl = BACKEND_URL;
 
   useEffect(() => {
-    if (!shop) return;
+    const checkAuth = async () => {
+      const urlShop = new URLSearchParams(window.location.search).get("shop");
+      const shop = urlShop || loaderShop;
 
-    const url = `https://highquality.allgovjobs.com/backend/api/check-token?shop=${encodeURIComponent(shop)}`;
-    fetch(url, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("[app._index] check-token response:", data);
-      })
-      .catch((err) => {
-        console.error("[app._index] check-token error:", err);
-      });
-  }, [shop]);
+      if (!shop) {
+        setIsCheckingAuth(false);
+        return;
+      }
+
+      fetch(`${backendUrl}/api/check-token?shop=${shop}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.authorized) {
+            const installUrl = `${backendUrl}/shopify?shop=${shop}`;
+            if (window.top !== window.self) {
+              window.top.location.href = installUrl;
+            } else {
+              window.location.href = installUrl;
+            }
+          } else {
+            setIsAuthorized(true);
+          }
+        })
+        .catch((err) => console.error("Auth check failed:", err))
+        .finally(() => setIsCheckingAuth(false));
+    };
+
+    checkAuth();
+  }, [backendUrl, loaderShop]);
+
+  if (isCheckingAuth) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          height: "100vh",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "18px",
+          fontWeight: "500",
+        }}
+      >
+        Loading authentication...
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return <div>Not authorized</div>;
+  }
 
   return (
     <s-page heading="Product Editor Manager">
