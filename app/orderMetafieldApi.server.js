@@ -3,7 +3,7 @@
  * Base URL: https://highquality.allgovjobs.com
  */
 
-const API_BASE = "https://highquality.allgovjobs.com";
+const API_BASE = "https://highquality.allgovjobs.com/backend";
 
 /**
  * POST /api/order-metafield - Save order metafield when customer places order
