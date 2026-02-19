@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLoaderData, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -30,6 +30,7 @@ export const loader = async ({ request }) => {
     }
 
     const data = await res.json().catch(() => null);
+    console.log("[app.orders] getOrderMetafield response:", JSON.stringify(data, null, 2));
     return {
       shop: session.shop,
       orderId,
@@ -119,6 +120,13 @@ export default function OrdersPage() {
   const { shop, orderId, metafield, error } = useLoaderData();
   const navigate = useNavigate();
   const [inputOrderId, setInputOrderId] = useState(orderId || "");
+
+  // Log response to browser console for debugging
+  useEffect(() => {
+    if (metafield != null) {
+      console.log("[Orders] API response:", metafield);
+    }
+  }, [metafield]);
 
   const handleLookup = (e) => {
     e.preventDefault();

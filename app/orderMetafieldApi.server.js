@@ -6,8 +6,9 @@
 const API_BASE = "https://highquality.allgovjobs.com/backend";
 
 /**
- * POST /api/order-metafield - Save order metafield when customer places order
- * @param {{ shop: string, order_id: string|number, line_items: object[], images: string[] }} body
+ * POST /api/order-metafield - Save order metafield when customer places order.
+ * Called from orders/create webhook (or Flow) so backend has order + CustomImage URLs when customer sees confirmation page.
+ * @param {{ shop: string, order_id: string|number, line_items: object[], images: string[] }} body - images are CustomImage URLs from line item properties
  * @returns {Promise<Response>}
  */
 export async function postOrderMetafield({ shop, order_id, line_items, images }) {
@@ -37,6 +38,7 @@ export async function getOrderMetafield({ shop, order_id }) {
  * @param {{ shop: string, order_id: string }} params
  * @returns {Promise<Response>}
  */
+
 export async function getOrderImagesZip({ shop, order_id }) {
   const url = new URL(`${API_BASE}/order-images-zip`);
   url.searchParams.set("shop", shop);
