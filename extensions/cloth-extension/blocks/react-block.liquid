@@ -1,7 +1,9 @@
+{% assign variant = product.selected_or_first_available_variant %}
 <div id="cloth-editor-app"
      data-product-id="{{ product.id }}"
      data-settings-url="/apps/customscale-app/product-settings?productId={{ product.id }}"
-     data-variant-id="{{ product.selected_or_first_available_variant.id }}"
+     data-variant-id="{{ variant.id }}"
+     data-variant-price="{{ variant.price | money_without_currency | strip }}"
      data-hoodie="{{ 'hoodie.png' | asset_url }}"
      data-cap="{{ 'cap.png' | asset_url }}"
      data-tshirt="{{ 'tshirt.png' | asset_url }}"

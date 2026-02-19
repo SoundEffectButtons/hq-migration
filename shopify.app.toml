@@ -22,13 +22,13 @@ api_version = "2025-01"
   topics = [ "app/uninstalled" ]
   uri = "/webhooks/app/uninstalled"
 
-  # orders/create contains protected customer data - uncomment after app approval for PCD, or when deploying
-  # [[webhooks.subscriptions]]
-  # topics = [ "orders/create" ]
-  # uri = "/webhooks/orders/create"
+  # When customer completes checkout (e.g. with CustomImage), we call postOrderMetafield so backend can save order metafield. PCD may be required for orders/create.
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create" ]
+  uri = "/webhooks/orders/create"
 
 [access_scopes]
-scopes = "write_products,write_orders,read_themes,read_orders,read_products"
+scopes = "write_products,write_orders,read_themes,read_orders,read_products,write_app_proxy"
 
 [app_proxy]
 url = "/api"

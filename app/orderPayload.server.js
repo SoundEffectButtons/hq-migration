@@ -4,7 +4,9 @@
  */
 
 /**
- * Extract image URLs from line item properties.
+ * Extract image URLs from line item properties (e.g. CustomImage from checkout).
+ * Matches property names: "CustomImage", "Custom Image", or any name containing "image",
+ * and any value that looks like a URL.
  * @param {Array<{ name?: string, value?: string }>} properties
  * @returns {string[]}
  */
@@ -12,11 +14,11 @@ export function extractImagesFromProperties(properties) {
   if (!Array.isArray(properties)) return [];
   const images = [];
   for (const p of properties) {
-    const name = (p.name || "").toLowerCase();
+    const name = (p.name || "").toLowerCase().replace(/\s+/g, "");
     const value = (p.value || "").trim();
-    if (name.includes("image") || name === "customimage" || /^https?:\/\//i.test(value)) {
-      if (value) images.push(value);
-    }
+    const isCustomImage =
+      name === "customimage" || name.includes("image") || /^https?:\/\//i.test(value);
+    if (isCustomImage && value) images.push(value);
   }
   return images;
 }
@@ -45,6 +47,8 @@ export function buildLineItemsAndImages(order) {
       variant_id: line.variant_id,
       product_id: line.product_id,
       properties: props,
+      /** First CustomImage (or image) URL for this line, for order metafield / confirmation */
+      custom_image_url: images[0] || null,
     });
   }
 
