@@ -15,7 +15,22 @@ const DEFAULT_SETTINGS = {
   enablePrecut: true,
   enableQuantity: true,
   enablePlacement: true,
+  predefinedSizes: [],
 };
+
+/** Parse predefinedSizes from DB (JSON string) to array of { width, height }. */
+function parsePredefinedSizes(raw) {
+  if (raw == null || raw === "") return [];
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((s) => s && typeof s.width === "number" && typeof s.height === "number")
+      .map((s) => ({ width: Number(s.width), height: Number(s.height) }));
+  } catch {
+    return [];
+  }
+}
 
 /** Normalize product ID: GID (gid://shopify/Product/123) -> numeric 123 */
 function normalizeProductId(productId) {
@@ -69,8 +84,9 @@ export const loader = async ({ request }) => {
           enablePrecut: settings.enablePrecut,
           enableQuantity: settings.enableQuantity,
           enablePlacement: settings.enablePlacement,
+          predefinedSizes: parsePredefinedSizes(settings.predefinedSizes),
         }
-      : DEFAULT_SETTINGS;
+      : { ...DEFAULT_SETTINGS };
 
     return json(payload, {
       headers: { "Cache-Control": "no-store, max-age=0" },
@@ -98,7 +114,7 @@ export const action = async ({ request }) => {
 
   try {
     const contentType = request.headers.get("content-type") || "";
-    let productId, enableSize, enablePrecut, enableQuantity, enablePlacement;
+    let productId, enableSize, enablePrecut, enableQuantity, enablePlacement, predefinedSizes;
 
     if (contentType.includes("application/json")) {
       const body = await request.json();
@@ -107,6 +123,9 @@ export const action = async ({ request }) => {
       enablePrecut = body.enablePrecut ?? true;
       enableQuantity = body.enableQuantity ?? true;
       enablePlacement = body.enablePlacement ?? true;
+      predefinedSizes = Array.isArray(body.predefinedSizes)
+        ? body.predefinedSizes
+        : [];
     } else {
       const formData = await request.formData();
       productId = formData.get("productId");
@@ -114,6 +133,17 @@ export const action = async ({ request }) => {
       enablePrecut = formData.get("enablePrecut") !== "false";
       enableQuantity = formData.get("enableQuantity") !== "false";
       enablePlacement = formData.get("enablePlacement") !== "false";
+      const rawSizes = formData.get("predefinedSizes");
+      if (typeof rawSizes === "string") {
+        try {
+          predefinedSizes = JSON.parse(rawSizes);
+          if (!Array.isArray(predefinedSizes)) predefinedSizes = [];
+        } catch {
+          predefinedSizes = [];
+        }
+      } else {
+        predefinedSizes = [];
+      }
     }
 
     productId = normalizeProductId(productId);
@@ -121,6 +151,15 @@ export const action = async ({ request }) => {
     if (!productId || typeof productId !== "string") {
       return json({ error: "productId is required" }, { status: 400 });
     }
+
+    const predefinedSizesJson =
+      Array.isArray(predefinedSizes) && predefinedSizes.length > 0
+        ? JSON.stringify(
+            predefinedSizes
+              .filter((s) => s && typeof s.width === "number" && typeof s.height === "number")
+              .map((s) => ({ width: Number(s.width), height: Number(s.height) }))
+          )
+        : null;
 
     const settings = await prisma.productCustomizerSettings.upsert({
       where: { shop_productId: { shop, productId } },
@@ -131,12 +170,14 @@ export const action = async ({ request }) => {
         enablePrecut,
         enableQuantity,
         enablePlacement,
+        predefinedSizes: predefinedSizesJson,
       },
       update: {
         enableSize,
         enablePrecut,
         enableQuantity,
         enablePlacement,
+        predefinedSizes: predefinedSizesJson,
       },
     });
 
@@ -147,6 +188,7 @@ export const action = async ({ request }) => {
         enablePrecut: settings.enablePrecut,
         enableQuantity: settings.enableQuantity,
         enablePlacement: settings.enablePlacement,
+        predefinedSizes: parsePredefinedSizes(settings.predefinedSizes),
       },
     });
   } catch (err) {

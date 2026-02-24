@@ -480,6 +480,15 @@ function ProductSettingsPanel({
   onSave,
   isSaving,
 }) {
+  const parseSizesText = (text) =>
+    (text || "")
+      .split(/\n/)
+      .map((line) => {
+        const match = line.trim().toUpperCase().match(/^(\d+(?:\.\d+)?)\s*[X×]\s*(\d+(?:\.\d+)?)$/);
+        return match ? { width: parseFloat(match[1]), height: parseFloat(match[2]) } : null;
+      })
+      .filter(Boolean);
+
   return (
     <div
       style={{
@@ -534,6 +543,37 @@ function ProductSettingsPanel({
           <span style={{ fontSize: "13px" }}>Enable design placement preview</span>
         </label>
       </div>
+
+      {settings.enableSize && (
+        <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #e1e3e5" }}>
+          <label style={{ display: "block", fontSize: "13px", fontWeight: "500", marginBottom: "8px", color: "#202223" }}>
+            Predefined design sizes
+          </label>
+          <p style={{ fontSize: "12px", color: "#6d7175", marginBottom: "8px" }}>
+            One size per line as <strong>Width×Height</strong> (e.g. 22.5X12, 22.5X24). Customers can pick these in addition to custom width/height.
+          </p>
+          <textarea
+            value={settings.predefinedSizesText ?? ""}
+            onChange={(e) => {
+              const text = e.target.value ?? "";
+              onSettingChange("predefinedSizesText", text);
+              onSettingChange("predefinedSizes", parseSizesText(text));
+            }}
+            placeholder={"22.5X12\n22.5X24\n22.5X36"}
+            rows={5}
+            style={{
+              width: "100%",
+              padding: "8px",
+              fontSize: "13px",
+              border: "1px solid #c9cccf",
+              borderRadius: "6px",
+              resize: "vertical",
+              fontFamily: "inherit",
+            }}
+          />
+        </div>
+      )}
+
       <button
         onClick={onSave}
         disabled={isSaving}
@@ -631,6 +671,8 @@ export default function EditorPage() {
     enablePrecut: true,
     enableQuantity: true,
     enablePlacement: true,
+    predefinedSizes: [],
+    predefinedSizesText: "",
   });
   // Derived state
   const isUpdating = fetcher.state !== "idle";
@@ -687,6 +729,8 @@ export default function EditorPage() {
         enablePrecut: true,
         enableQuantity: true,
         enablePlacement: true,
+        predefinedSizes: [],
+        predefinedSizesText: "",
       });
       return;
     }
@@ -698,11 +742,14 @@ export default function EditorPage() {
   useEffect(() => {
     if (settingsLoaderFetcher.data && selectedIds.length === 1) {
       const d = settingsLoaderFetcher.data;
+      const sizes = Array.isArray(d.predefinedSizes) ? d.predefinedSizes : [];
       setProductSettings({
         enableSize: d.enableSize ?? true,
         enablePrecut: d.enablePrecut ?? true,
         enableQuantity: d.enableQuantity ?? true,
         enablePlacement: d.enablePlacement ?? true,
+        predefinedSizes: sizes,
+        predefinedSizesText: sizes.map((s) => `${s.width}X${s.height}`).join("\n"),
       });
     }
   }, [settingsLoaderFetcher.data, selectedIds.length]);
@@ -800,6 +847,7 @@ export default function EditorPage() {
         enablePrecut: String(productSettings.enablePrecut),
         enableQuantity: String(productSettings.enableQuantity),
         enablePlacement: String(productSettings.enablePlacement),
+        predefinedSizes: JSON.stringify(productSettings.predefinedSizes ?? []),
       },
       { method: "POST", action: "/api/product-settings" }
     );
