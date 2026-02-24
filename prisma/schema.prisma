@@ -14,14 +14,15 @@ datasource db {
 }
 
 model ProductCustomizerSettings {
-  id               String   @id @default(cuid())
-  shop             String
-  productId        String
-  enableSize       Boolean  @default(true)
-  enablePrecut     Boolean  @default(true)
-  enableQuantity   Boolean  @default(true)
-  enablePlacement  Boolean  @default(true)
-  createdAt        DateTime @default(now())
+  id                String   @id @default(cuid())
+  shop              String
+  productId         String
+  enableSize        Boolean  @default(true)
+  enablePrecut      Boolean  @default(true)
+  enableQuantity    Boolean  @default(true)
+  enablePlacement   Boolean  @default(true)
+  predefinedSizes   String?  // JSON array: [{ width: number, height: number }, ...]
+  createdAt         DateTime @default(now())
 
   @@unique([shop, productId])
 }
