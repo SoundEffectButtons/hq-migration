@@ -42,6 +42,8 @@ export function run(input) {
     const precutAttr = line.preCut?.value;
     const quantity = Math.max(1, Number(line.quantity) || 1);
 
+    const currencyCode = line.cost?.amountPerQuantity?.currencyCode || "USD";
+
     const width = parseFloat(widthAttr || "0");
     const height = parseFloat(heightAttr || "0");
     const precut = precutAttr === "Yes";
@@ -61,16 +63,16 @@ export function run(input) {
       DISCOUNT_TIERS[0];
     const discountedUnitPrice = unitPrice * (1 - tier.discount);
 
-    // Amount must be a Decimal (number) — NOT a string
-    const finalPrice = Math.round(discountedUnitPrice * 100) / 100;
+    const finalPrice = discountedUnitPrice.toFixed(2);
 
     operations.push({
-      lineUpdate: {
+      update: {
         cartLineId: line.id,
         price: {
           adjustment: {
             fixedPricePerUnit: {
               amount: finalPrice,
+              currencyCode: currencyCode,
             },
           },
         },
