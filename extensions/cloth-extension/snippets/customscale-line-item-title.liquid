@@ -1,0 +1,16 @@
+{% comment %}
+  Renders the display title for a cart line item.
+  For CustomScale items, shows the "Product" line item property (the selected product name)
+  instead of the carrier product title ("CustomScale Dynamic Product").
+
+  Usage in your theme's cart section (e.g. main-cart-items or cart-drawer):
+    {% render 'customscale-line-item-title', line_item: line_item %}
+
+  Or with variable name 'item':
+    {% render 'customscale-line-item-title', line_item: item %}
+{% endcomment %}
+{% if line_item.properties.Product != blank %}
+  {{ line_item.properties.Product }}
+{% else %}
+  {{ line_item.product.title }}
+{% endif %}

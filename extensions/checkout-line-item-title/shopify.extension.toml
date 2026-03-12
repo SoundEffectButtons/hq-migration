@@ -1,0 +1,18 @@
+# Checkout UI extension: show dynamic product name for CustomScale line items
+# When a line item has the "Product" property (the real product title), display it
+# so checkout shows the customized product name instead of only "CustomScale Dynamic Product".
+api_version = "2025-10"
+
+[[extensions]]
+uid = "12b3c06e-b60f-0f96-ceea-54ee0225c1920032793b"
+type = "ui_extension"
+name = "checkout-line-item-title"
+handle = "checkout-line-item-title"
+
+[[extensions.targeting]]
+target = "purchase.checkout.cart-line-item.render-after"
+module = "./src/Checkout.jsx"
+
+[[extensions.targeting]]
+target = "purchase.thank-you.cart-line-item.render-after"
+module = "./src/ThankYou.jsx"

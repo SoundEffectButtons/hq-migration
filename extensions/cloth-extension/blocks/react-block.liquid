@@ -1,7 +1,9 @@
 {% assign variant = product.selected_or_first_available_variant %}
 <div id="cloth-editor-app"
      data-product-id="{{ product.id }}"
+     data-product-title="{{ product.title | escape }}"
      data-settings-url="/apps/customscale-app/product-settings?productId={{ product.id }}"
+     data-cart-url="/apps/customscale-app/cart-add"
      data-variant-id="{{ variant.id }}"
      data-variant-price="{{ variant.price | money_without_currency | strip }}"
      data-hoodie="{{ 'hoodie.png' | asset_url }}"
@@ -13,16 +15,91 @@
      data-front="{{ 'front-shirt.png' | asset_url }}"
      data-back="{{ 'back-shirt.png' | asset_url }}"
      data-side="{{ 'left-side-shirt.png' | asset_url }}">
-  <div style="padding: 40px; text-align: center; color: #6b7280;">
-    <div style="width: 40px; height: 40px; margin: 0 auto 16px; border: 3px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-    <p>Loading editor...</p>
+  <div class="cloth-editor-skeleton" aria-hidden="true">
+    <div class="cloth-skeleton-header">
+      <div class="cloth-skeleton-line cloth-skeleton-title"></div>
+      <div class="cloth-skeleton-line cloth-skeleton-subtitle"></div>
+    </div>
+    <div class="cloth-skeleton-columns">
+      <div class="cloth-skeleton-left">
+        <div class="cloth-skeleton-card">
+          <div class="cloth-skeleton-line cloth-skeleton-step"></div>
+          <div class="cloth-skeleton-upload"></div>
+        </div>
+        <div class="cloth-skeleton-card">
+          <div class="cloth-skeleton-line cloth-skeleton-label"></div>
+          <div class="cloth-skeleton-preview-grid">
+            {% for i in (1..6) %}<div class="cloth-skeleton-preview-item"></div>{% endfor %}
+          </div>
+          <div class="cloth-skeleton-line cloth-skeleton-small"></div>
+          <div class="cloth-skeleton-colors"></div>
+        </div>
+        <div class="cloth-skeleton-card">
+          <div class="cloth-skeleton-line cloth-skeleton-label"></div>
+          <div class="cloth-skeleton-placement-row">
+            {% for i in (1..4) %}<div class="cloth-skeleton-placement-item"></div>{% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="cloth-skeleton-right">
+        <div class="cloth-skeleton-card">
+          <div class="cloth-skeleton-line cloth-skeleton-step"></div>
+          <div class="cloth-skeleton-row">
+            <div class="cloth-skeleton-input"></div>
+            <div class="cloth-skeleton-input"></div>
+          </div>
+          <div class="cloth-skeleton-line cloth-skeleton-area"></div>
+        </div>
+        <div class="cloth-skeleton-card cloth-skeleton-checkbox-row">
+          <div class="cloth-skeleton-checkbox"></div>
+          <div class="cloth-skeleton-line cloth-skeleton-option"></div>
+        </div>
+        <div class="cloth-skeleton-card">
+          <div class="cloth-skeleton-line cloth-skeleton-label"></div>
+          <div class="cloth-skeleton-quantity"></div>
+        </div>
+        <div class="cloth-skeleton-card">
+          <div class="cloth-skeleton-line cloth-skeleton-label"></div>
+          <div class="cloth-skeleton-line cloth-skeleton-price-line"></div>
+          <div class="cloth-skeleton-line cloth-skeleton-price-line"></div>
+          <div class="cloth-skeleton-total"></div>
+        </div>
+        <div class="cloth-skeleton-btn"></div>
+      </div>
+    </div>
   </div>
 </div>
 
 <style>
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
+  .cloth-editor-skeleton { padding: 24px 0; max-width: 1200px; margin: 0 auto; }
+  .cloth-skeleton-header { margin-bottom: 28px; }
+  .cloth-skeleton-title { width: 280px; height: 28px; margin-bottom: 8px; border-radius: 6px; }
+  .cloth-skeleton-subtitle { width: 360px; height: 16px; border-radius: 4px; }
+  .cloth-skeleton-columns { display: grid; grid-template-columns: 1fr 380px; gap: 32px; align-items: start; }
+  @media (max-width: 900px) { .cloth-skeleton-columns { grid-template-columns: 1fr; } }
+  .cloth-skeleton-left, .cloth-skeleton-right { display: flex; flex-direction: column; gap: 24px; }
+  .cloth-skeleton-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .cloth-skeleton-line { background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); background-size: 200% 100%; animation: cloth-skeleton-shimmer 1.5s ease-in-out infinite; }
+  .cloth-skeleton-step { width: 180px; height: 18px; margin-bottom: 16px; border-radius: 4px; }
+  .cloth-skeleton-label { width: 220px; height: 14px; margin-bottom: 12px; border-radius: 4px; }
+  .cloth-skeleton-small { width: 260px; height: 12px; margin: 12px 0 10px; border-radius: 4px; }
+  .cloth-skeleton-upload { height: 180px; border-radius: 10px; border: 2px dashed #e5e7eb; background: linear-gradient(90deg, #f9fafb 25%, #f3f4f6 50%, #f9fafb 75%); background-size: 200% 100%; animation: cloth-skeleton-shimmer 1.5s ease-in-out infinite; }
+  .cloth-skeleton-preview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .cloth-skeleton-preview-item { aspect-ratio: 1; border-radius: 8px; background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); background-size: 200% 100%; animation: cloth-skeleton-shimmer 1.5s ease-in-out infinite; }
+  .cloth-skeleton-colors { height: 28px; border-radius: 6px; margin-top: 8px; background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); background-size: 200% 100%; animation: cloth-skeleton-shimmer 1.5s ease-in-out infinite; }
+  .cloth-skeleton-placement-row { display: flex; gap: 12px; overflow: hidden; }
+  .cloth-skeleton-placement-item { flex: 0 0 100px; height: 100px; border-radius: 8px; background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); background-size: 200% 100%; animation: cloth-skeleton-shimmer 1.5s ease-in-out infinite; }
+  .cloth-skeleton-row { display: flex; gap: 12px; margin-bottom: 12px; }
+  .cloth-skeleton-input { flex: 1; height: 44px; border-radius: 8px; background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); background-size: 200% 100%; animation: cloth-skeleton-shimmer 1.5s ease-in-out infinite; }
+  .cloth-skeleton-area { width: 140px; height: 16px; border-radius: 4px; }
+  .cloth-skeleton-checkbox-row { display: flex; align-items: center; gap: 12px; }
+  .cloth-skeleton-checkbox { width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); background-size: 200% 100%; animation: cloth-skeleton-shimmer 1.5s ease-in-out infinite; }
+  .cloth-skeleton-option { width: 200px; height: 14px; margin: 0; border-radius: 4px; }
+  .cloth-skeleton-quantity { height: 44px; width: 120px; border-radius: 8px; background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); background-size: 200% 100%; animation: cloth-skeleton-shimmer 1.5s ease-in-out infinite; }
+  .cloth-skeleton-price-line { width: 100%; height: 14px; margin-bottom: 8px; border-radius: 4px; }
+  .cloth-skeleton-total { width: 100px; height: 24px; margin-top: 12px; border-radius: 6px; background: linear-gradient(90deg, #bfdbfe 25%, #dbeafe 50%, #bfdbfe 75%); background-size: 200% 100%; animation: cloth-skeleton-shimmer 1.5s ease-in-out infinite; }
+  .cloth-skeleton-btn { height: 48px; margin-top: 20px; border-radius: 10px; background: linear-gradient(90deg, #93c5fd 25%, #bfdbfe 50%, #93c5fd 75%); background-size: 200% 100%; animation: cloth-skeleton-shimmer 1.5s ease-in-out infinite; }
+  @keyframes cloth-skeleton-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
   .product-form__buttons,
   .shopify-payment-button {
     display: none !important;
