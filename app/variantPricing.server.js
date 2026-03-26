@@ -12,26 +12,26 @@
  *   Pool is capped at MAX_VARIANTS; when full, PRUNE_COUNT oldest are removed first.
  *
  * Environment:
- *   CUSTOM_PRODUCT_ID=gid://shopify/Product/9874439864560
+ *   CUSTOM_PRODUCT_ID=gid://shopify/Product/7918491762736
  */
 
 // ─── Pricing constants ────────────────────────────────────────────────────────
 
 const PRICE_PER_SQIN = 0.0416;
-const PRECUT_FEE     = 0.24;
+const PRECUT_FEE = 0.24;
 
 const DISCOUNT_TIERS = [
-  { minQty: 1,   maxQty: 14,       discount: 0    },
-  { minQty: 15,  maxQty: 49,       discount: 0.20 },
-  { minQty: 50,  maxQty: 99,       discount: 0.30 },
-  { minQty: 100, maxQty: 249,      discount: 0.40 },
-  { minQty: 250, maxQty: Infinity, discount: 0.50 },
+  { minQty: 1, maxQty: 14, discount: 0 },
+  { minQty: 15, maxQty: 49, discount: 0.2 },
+  { minQty: 50, maxQty: 99, discount: 0.3 },
+  { minQty: 100, maxQty: 249, discount: 0.4 },
+  { minQty: 250, maxQty: Infinity, discount: 0.5 },
 ];
 
 // ─── Variant pool limits ──────────────────────────────────────────────────────
 
-const MAX_VARIANTS  = 90;
-const PRUNE_COUNT   = 10;
+const MAX_VARIANTS = 90;
+const PRUNE_COUNT = 10;
 
 // The option name on the carrier product that holds the price value.
 const CARRIER_OPTION_NAME = "Price";
@@ -135,13 +135,59 @@ const DELETE_VARIANTS_MUTATION = `#graphql
 export function calculateUnitPrice(width, height, preCut, quantity) {
   const areaPrice = width * height * PRICE_PER_SQIN;
   const precutFee = preCut ? PRECUT_FEE : 0;
-  const rawUnit   = areaPrice + precutFee;
+  const rawUnit = areaPrice + precutFee;
 
-  const tier = DISCOUNT_TIERS.find(
-    (t) => quantity >= t.minQty && quantity <= t.maxQty,
-  ) ?? DISCOUNT_TIERS[0];
+  const tier =
+    DISCOUNT_TIERS.find((t) => quantity >= t.minQty && quantity <= t.maxQty) ??
+    DISCOUNT_TIERS[0];
 
   return parseFloat((rawUnit * (1 - tier.discount)).toFixed(2));
+}
+
+/**
+ * Make sure a variant is always cart-addable on storefront:
+ *  - inventoryPolicy: CONTINUE (allow oversell)
+ *  - inventory tracking disabled when supported by API input
+ */
+async function ensureVariantPurchasable(admin, productGid, variantId) {
+  try {
+    const res = await admin.graphql(UPDATE_VARIANTS_MUTATION, {
+      variables: {
+        productId: productGid,
+        variants: [
+          {
+            id: variantId,
+            inventoryPolicy: "CONTINUE",
+            inventoryItem: { tracked: false },
+          },
+        ],
+      },
+    });
+    const data = await res.json();
+    const errs = data?.data?.productVariantsBulkUpdate?.userErrors ?? [];
+    if (!errs.length) return true;
+
+    // Some API versions/stores may reject inventoryItem in bulk update.
+    const fallback = await admin.graphql(UPDATE_VARIANTS_MUTATION, {
+      variables: {
+        productId: productGid,
+        variants: [{ id: variantId, inventoryPolicy: "CONTINUE" }],
+      },
+    });
+    const fallbackData = await fallback.json();
+    const fallbackErrs = fallbackData?.data?.productVariantsBulkUpdate?.userErrors ?? [];
+    if (fallbackErrs.length) {
+      console.error(
+        "[variantPricing] ensureVariantPurchasable errors:",
+        JSON.stringify(fallbackErrs),
+      );
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[variantPricing] ensureVariantPurchasable threw:", err);
+    return false;
+  }
 }
 
 /**
@@ -150,7 +196,7 @@ export function calculateUnitPrice(width, height, preCut, quantity) {
  * pool reaches MAX_VARIANTS.
  *
  * @param {object} admin      - Shopify Admin API client (from authenticate.*)
- * @param {string} productGid - GID, e.g. "gid://shopify/Product/9874439864560"
+ * @param {string} productGid - GID, e.g. "gid://shopify/Product/7918491762736"
  * @param {number} price      - unit price (will be formatted to 2 decimal places)
  * @returns {Promise<{ variantGid: string, numericId: string }>}
  */
@@ -158,7 +204,9 @@ export async function getOrCreateVariant(admin, productGid, price) {
   const priceStr = price.toFixed(2);
 
   // ── 1. Load existing variants + product options ───────────────────────────
-  const listRes  = await admin.graphql(GET_VARIANTS_QUERY, { variables: { id: productGid } });
+  const listRes = await admin.graphql(GET_VARIANTS_QUERY, {
+    variables: { id: productGid },
+  });
   const listJson = await listRes.json();
 
   if (listJson.errors?.length) {
@@ -168,32 +216,42 @@ export async function getOrCreateVariant(admin, productGid, price) {
   }
 
   const productData = listJson.data?.product;
-  const edges       = productData?.variants?.edges ?? [];
-  const variants    = edges.map((e) => e.node);
-  const options     = productData?.options ?? [];
+  const edges = productData?.variants?.edges ?? [];
+  const variants = edges.map((e) => e.node);
+  const options = productData?.options ?? [];
 
   // ── 1b. Ensure carrier product is ACTIVE so storefront can add its variants ─
-  const statusRes  = await admin.graphql(GET_PRODUCT_STATUS_QUERY, { variables: { id: productGid } });
+  const statusRes = await admin.graphql(GET_PRODUCT_STATUS_QUERY, {
+    variables: { id: productGid },
+  });
   const statusJson = await statusRes.json();
   const currentStatus = statusJson.data?.product?.status;
 
   if (currentStatus && currentStatus !== "ACTIVE") {
-    console.log(`[variantPricing] Activating carrier product (was ${currentStatus})`);
-    const activateRes  = await admin.graphql(ACTIVATE_PRODUCT_MUTATION, {
+    console.log(
+      `[variantPricing] Activating carrier product (was ${currentStatus})`,
+    );
+    const activateRes = await admin.graphql(ACTIVATE_PRODUCT_MUTATION, {
       variables: { input: { id: productGid, status: "ACTIVE" } },
     });
     const activateJson = await activateRes.json();
     const activateErrs = activateJson.data?.productUpdate?.userErrors ?? [];
     if (activateErrs.length) {
-      console.error("[variantPricing] Failed to activate product:", JSON.stringify(activateErrs));
+      console.error(
+        "[variantPricing] Failed to activate product:",
+        JSON.stringify(activateErrs),
+      );
     } else {
       console.log("[variantPricing] Carrier product set to ACTIVE");
     }
   }
 
   // ── 2. Return existing variant if price already matches ────────────────────
-  const match = variants.find((v) => parseFloat(v.price).toFixed(2) === priceStr);
+  const match = variants.find(
+    (v) => parseFloat(v.price).toFixed(2) === priceStr,
+  );
   if (match) {
+    await ensureVariantPurchasable(admin, productGid, match.id);
     return { variantGid: match.id, numericId: match.id.split("/").pop() };
   }
 
@@ -203,8 +261,10 @@ export async function getOrCreateVariant(admin, productGid, price) {
   );
 
   if (!priceOptionExists) {
-    console.log(`[variantPricing] Creating "${CARRIER_OPTION_NAME}" option on product`);
-    const optRes  = await admin.graphql(CREATE_OPTION_MUTATION, {
+    console.log(
+      `[variantPricing] Creating "${CARRIER_OPTION_NAME}" option on product`,
+    );
+    const optRes = await admin.graphql(CREATE_OPTION_MUTATION, {
       variables: {
         productId: productGid,
         options: [{ name: CARRIER_OPTION_NAME, values: [{ name: priceStr }] }],
@@ -221,9 +281,12 @@ export async function getOrCreateVariant(admin, productGid, price) {
 
     // Shopify auto-creates a variant with the option value but sets price=0.
     // Refetch, find that variant by its selectedOptions value, then update its price.
-    const refetchRes  = await admin.graphql(GET_VARIANTS_QUERY, { variables: { id: productGid } });
+    const refetchRes = await admin.graphql(GET_VARIANTS_QUERY, {
+      variables: { id: productGid },
+    });
     const refetchJson = await refetchRes.json();
-    const newVariants = refetchJson.data?.product?.variants?.edges?.map((e) => e.node) ?? [];
+    const newVariants =
+      refetchJson.data?.product?.variants?.edges?.map((e) => e.node) ?? [];
 
     const autoCreated = newVariants.find((v) =>
       v.selectedOptions?.some(
@@ -235,36 +298,58 @@ export async function getOrCreateVariant(admin, productGid, price) {
 
     if (autoCreated) {
       // Update the price on the auto-created variant
-      const updRes  = await admin.graphql(UPDATE_VARIANTS_MUTATION, {
+      const updRes = await admin.graphql(UPDATE_VARIANTS_MUTATION, {
         variables: {
           productId: productGid,
-          variants: [{ id: autoCreated.id, price: priceStr, inventoryPolicy: "CONTINUE" }],
+          variants: [
+            {
+              id: autoCreated.id,
+              price: priceStr,
+              inventoryPolicy: "CONTINUE",
+            },
+          ],
         },
       });
       const updJson = await updRes.json();
       const updErrs = updJson.data?.productVariantsBulkUpdate?.userErrors ?? [];
       if (updErrs.length) {
-        console.error("[variantPricing] price update userErrors:", JSON.stringify(updErrs));
+        console.error(
+          "[variantPricing] price update userErrors:",
+          JSON.stringify(updErrs),
+        );
       } else {
-        console.log("[variantPricing] Auto-created variant price set to", priceStr, autoCreated.id);
+        console.log(
+          "[variantPricing] Auto-created variant price set to",
+          priceStr,
+          autoCreated.id,
+        );
       }
-      return { variantGid: autoCreated.id, numericId: autoCreated.id.split("/").pop() };
+      await ensureVariantPurchasable(admin, productGid, autoCreated.id);
+      return {
+        variantGid: autoCreated.id,
+        numericId: autoCreated.id.split("/").pop(),
+      };
     }
   }
 
   // ── 4. Prune oldest variants when pool is full ─────────────────────────────
   if (variants.length >= MAX_VARIANTS) {
-    const sorted   = [...variants].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const sorted = [...variants].sort(
+      (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+    );
     const toDelete = sorted.slice(0, PRUNE_COUNT).map((v) => v.id);
 
     try {
-      const delRes  = await admin.graphql(DELETE_VARIANTS_MUTATION, {
+      const delRes = await admin.graphql(DELETE_VARIANTS_MUTATION, {
         variables: { productId: productGid, variantsIds: toDelete },
       });
       const delJson = await delRes.json();
-      const errs    = delJson.data?.productVariantsBulkDelete?.userErrors ?? [];
+      const errs = delJson.data?.productVariantsBulkDelete?.userErrors ?? [];
       if (errs.length) {
-        console.error("[variantPricing] Prune delete userErrors:", JSON.stringify(errs));
+        console.error(
+          "[variantPricing] Prune delete userErrors:",
+          JSON.stringify(errs),
+        );
       } else {
         console.log("[variantPricing] Pruned", toDelete.length, "old variants");
       }
@@ -274,14 +359,14 @@ export async function getOrCreateVariant(admin, productGid, price) {
   }
 
   // ── 5. Create new variant ──────────────────────────────────────────────────
-  const createRes  = await admin.graphql(CREATE_VARIANT_MUTATION, {
+  const createRes = await admin.graphql(CREATE_VARIANT_MUTATION, {
     variables: {
       productId: productGid,
       variants: [
         {
-          price:           priceStr,
+          price: priceStr,
           inventoryPolicy: "CONTINUE",
-          optionValues:    [{ name: priceStr, optionName: CARRIER_OPTION_NAME }],
+          optionValues: [{ name: priceStr, optionName: CARRIER_OPTION_NAME }],
         },
       ],
     },
@@ -294,17 +379,23 @@ export async function getOrCreateVariant(admin, productGid, price) {
     );
   }
 
-  const userErrors = createJson.data?.productVariantsBulkCreate?.userErrors ?? [];
+  const userErrors =
+    createJson.data?.productVariantsBulkCreate?.userErrors ?? [];
   if (userErrors.length) {
     // If the variant already exists (race condition), fetch it and return
     const alreadyExists = userErrors.some((e) =>
       e.message?.toLowerCase().includes("already exists"),
     );
     if (alreadyExists) {
-      console.log("[variantPricing] Variant already exists, fetching by option value");
-      const reRes   = await admin.graphql(GET_VARIANTS_QUERY, { variables: { id: productGid } });
-      const reJson  = await reRes.json();
-      const reVars  = reJson.data?.product?.variants?.edges?.map((e) => e.node) ?? [];
+      console.log(
+        "[variantPricing] Variant already exists, fetching by option value",
+      );
+      const reRes = await admin.graphql(GET_VARIANTS_QUERY, {
+        variables: { id: productGid },
+      });
+      const reJson = await reRes.json();
+      const reVars =
+        reJson.data?.product?.variants?.edges?.map((e) => e.node) ?? [];
       const reMatch = reVars.find((v) =>
         v.selectedOptions?.some(
           (o) =>
@@ -313,14 +404,11 @@ export async function getOrCreateVariant(admin, productGid, price) {
         ),
       );
       if (reMatch) {
-        // Ensure this existing variant is also purchasable
-        await admin.graphql(UPDATE_VARIANTS_MUTATION, {
-          variables: {
-            productId: productGid,
-            variants: [{ id: reMatch.id, inventoryPolicy: "CONTINUE" }],
-          },
-        }).catch((e) => console.error("[variantPricing] inventoryPolicy fix (reMatch):", e));
-        return { variantGid: reMatch.id, numericId: reMatch.id.split("/").pop() };
+        await ensureVariantPurchasable(admin, productGid, reMatch.id);
+        return {
+          variantGid: reMatch.id,
+          numericId: reMatch.id.split("/").pop(),
+        };
       }
     }
     throw new Error(
@@ -328,34 +416,27 @@ export async function getOrCreateVariant(admin, productGid, price) {
     );
   }
 
-  const newVariant = createJson.data?.productVariantsBulkCreate?.productVariants?.[0];
+  const newVariant =
+    createJson.data?.productVariantsBulkCreate?.productVariants?.[0];
   if (!newVariant) {
-    throw new Error("[variantPricing] productVariantsBulkCreate returned no variants");
+    throw new Error(
+      "[variantPricing] productVariantsBulkCreate returned no variants",
+    );
   }
 
-  console.log("[variantPricing] Created variant:", newVariant.id, "price:", newVariant.price);
+  console.log(
+    "[variantPricing] Created variant:",
+    newVariant.id,
+    "price:",
+    newVariant.price,
+  );
 
-  // Force inventoryPolicy=CONTINUE via a follow-up update — the create input
-  // field is sometimes ignored by Shopify if inventory management is enabled.
-  try {
-    const fixRes  = await admin.graphql(UPDATE_VARIANTS_MUTATION, {
-      variables: {
-        productId: productGid,
-        variants: [{ id: newVariant.id, inventoryPolicy: "CONTINUE" }],
-      },
-    });
-    const fixJson = await fixRes.json();
-    const fixErrs = fixJson.data?.productVariantsBulkUpdate?.userErrors ?? [];
-    if (fixErrs.length) {
-      console.error("[variantPricing] inventoryPolicy fix errors:", JSON.stringify(fixErrs));
-    } else {
-      console.log("[variantPricing] inventoryPolicy set to CONTINUE for", newVariant.id);
-    }
-  } catch (e) {
-    console.error("[variantPricing] inventoryPolicy fix threw:", e);
-  }
+  await ensureVariantPurchasable(admin, productGid, newVariant.id);
 
-  return { variantGid: newVariant.id, numericId: newVariant.id.split("/").pop() };
+  return {
+    variantGid: newVariant.id,
+    numericId: newVariant.id.split("/").pop(),
+  };
 }
 
 /**
@@ -373,13 +454,17 @@ export async function deleteVariant(admin, variantGid) {
   }
 
   try {
-    const res  = await admin.graphql(DELETE_VARIANTS_MUTATION, {
+    const res = await admin.graphql(DELETE_VARIANTS_MUTATION, {
       variables: { productId: productGid, variantsIds: [variantGid] },
     });
     const data = await res.json();
     const errs = data?.data?.productVariantsBulkDelete?.userErrors ?? [];
     if (errs.length) {
-      console.error("[variantPricing] deleteVariant userErrors:", variantGid, JSON.stringify(errs));
+      console.error(
+        "[variantPricing] deleteVariant userErrors:",
+        variantGid,
+        JSON.stringify(errs),
+      );
     } else {
       console.log("[variantPricing] Deleted variant:", variantGid);
     }

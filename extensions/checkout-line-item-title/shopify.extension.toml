@@ -11,8 +11,8 @@ handle = "checkout-line-item-title"
 
 [[extensions.targeting]]
 target = "purchase.checkout.cart-line-item.render-after"
-module = "./src/Checkout.jsx"
+module = "./src/Checkout.js"
 
 [[extensions.targeting]]
 target = "purchase.thank-you.cart-line-item.render-after"
-module = "./src/ThankYou.jsx"
+module = "./src/ThankYou.js"

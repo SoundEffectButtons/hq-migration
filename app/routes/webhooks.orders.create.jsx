@@ -10,14 +10,16 @@
  * the 200 response Shopify requires within 5 s.
  */
 
-import { authenticate }         from "../shopify.server";
-import { postOrderMetafield }   from "../orderMetafieldApi.server";
+import { authenticate } from "../shopify.server";
+import { postOrderMetafield } from "../orderMetafieldApi.server";
 import { buildLineItemsAndImages, getOrderId } from "../orderPayload.server";
-import { deleteVariant }        from "../variantPricing.server";
+import { deleteVariant } from "../variantPricing.server";
 
 // Numeric product ID extracted from the GID env var at startup.
-// e.g. "gid://shopify/Product/9874439864560" → "9874439864560"
-const CARRIER_NUMERIC_ID = (process.env.CUSTOM_PRODUCT_ID ?? "").split("/").pop();
+// e.g. "gid://shopify/Product/7918491762736" → "7918491762736"
+const CARRIER_NUMERIC_ID = (process.env.CUSTOM_PRODUCT_ID ?? "")
+  .split("/")
+  .pop();
 
 export const action = async ({ request }) => {
   const { payload, topic, shop, admin } = await authenticate.webhook(request);
@@ -26,7 +28,7 @@ export const action = async ({ request }) => {
     return new Response(null, { status: 400 });
   }
 
-  const order   = payload;
+  const order = payload;
   const orderId = getOrderId(order);
   if (!orderId) {
     console.error("[webhooks.orders.create] Missing order id in payload");
@@ -37,15 +39,25 @@ export const action = async ({ request }) => {
 
   // ── 1. Forward to external order-metafield backend ────────────────────────
   try {
-    const res = await postOrderMetafield({ shop, order_id: orderId, line_items: lineItems, images });
+    const res = await postOrderMetafield({
+      shop,
+      order_id: orderId,
+      line_items: lineItems,
+      images,
+    });
     if (!res.ok) {
       const text = await res.text();
-      console.error("[webhooks.orders.create] order-metafield API error:", res.status, text);
+      console.error(
+        "[webhooks.orders.create] order-metafield API error:",
+        res.status,
+        text,
+      );
     } else {
       console.log(
         "[webhooks.orders.create] order-metafield API called for order",
         orderId,
-        "images:", images?.length ?? 0,
+        "images:",
+        images?.length ?? 0,
       );
     }
   } catch (err) {
