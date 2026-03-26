@@ -54,6 +54,18 @@ describe("extractImagesFromProperties", () => {
     assert.deepStrictEqual(extractImagesFromProperties(null), []);
     assert.deepStrictEqual(extractImagesFromProperties(undefined), []);
   });
+
+  it("extracts from key/value shape (GraphQL customAttributes style)", () => {
+    const props = [{ key: "Image URL", value: "https://cdn.example.com/design.png" }];
+    const got = extractImagesFromProperties(props);
+    assert.deepStrictEqual(got, ["https://cdn.example.com/design.png"]);
+  });
+
+  it("extracts from object map shape", () => {
+    const props = { CustomImage: "https://cdn.example.com/design2.png" };
+    const got = extractImagesFromProperties(props);
+    assert.deepStrictEqual(got, ["https://cdn.example.com/design2.png"]);
+  });
 });
 
 describe("buildLineItemsAndImages", () => {

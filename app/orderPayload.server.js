@@ -4,16 +4,40 @@
  */
 
 /**
+ * Normalize Shopify property/customAttribute shapes to { name, value }[].
+ * Accepts:
+ *  - [{ name, value }]
+ *  - [{ key, value }]
+ *  - { key: value, ... }
+ */
+function normalizeProperties(properties) {
+  if (Array.isArray(properties)) {
+    return properties.map((p) => ({
+      name: String(p?.name ?? p?.key ?? ""),
+      value: String(p?.value ?? ""),
+    }));
+  }
+  if (properties && typeof properties === "object") {
+    return Object.entries(properties).map(([name, value]) => ({
+      name: String(name),
+      value: String(value ?? ""),
+    }));
+  }
+  return [];
+}
+
+/**
  * Extract image URLs from line item properties (e.g. CustomImage from checkout).
  * Matches property names: "CustomImage", "Custom Image", or any name containing "image",
  * and any value that looks like a URL.
- * @param {Array<{ name?: string, value?: string }>} properties
+ * @param {Array<{ name?: string, value?: string }>|Array<{ key?: string, value?: string }>|Record<string, string>} properties
  * @returns {string[]}
  */
 export function extractImagesFromProperties(properties) {
-  if (!Array.isArray(properties)) return [];
+  const normalized = normalizeProperties(properties);
+  if (normalized.length === 0) return [];
   const images = [];
-  for (const p of properties) {
+  for (const p of normalized) {
     const name = (p.name || "").toLowerCase().replace(/\s+/g, "");
     const value = (p.value || "").trim();
     const isCustomImage =
@@ -34,7 +58,7 @@ export function buildLineItemsAndImages(order) {
   const rawLines = order.line_items || [];
 
   for (const line of rawLines) {
-    const props = line.properties || [];
+    const props = normalizeProperties(line.properties);
     const images = extractImagesFromProperties(props);
     allImages.push(...images);
     lineItems.push({

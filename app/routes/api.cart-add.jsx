@@ -230,18 +230,19 @@ export const action = async ({ request }) => {
       }
 
       const properties = {
-        Width: String(line.width),
-        Height: String(line.height),
+        Dimensions: `${line.width}" x ${line.height}"`,
         PreCut: line.preCut ? "Yes" : "No",
-        UnitPrice: unitPrice.toFixed(2),
       };
-      if (displayProductName) properties.Product = displayProductName;
-      if (customImage) properties.CustomImage = customImage;
       if (line.placementLabel) properties.Placement = line.placementLabel;
-      if (line.placementView) properties.PlacementView = line.placementView;
-      if (line.placementId) properties.PlacementId = line.placementId;
       if (line.sizeLabel) properties.Size = line.sizeLabel;
-      if (line.sizeId) properties.SizeId = line.sizeId;
+      if (!line.sizeLabel) properties.Size = "Custom";
+      if (customImage) {
+        // Keep one canonical key and one human-readable key so it is visible
+        // both in storefront/order UIs and downstream webhook payload parsing.
+        properties.CustomImage = customImage;
+        properties["Image URL"] = customImage;
+      }
+      if (displayProductName) properties.Product = displayProductName;
 
       items.push({
         id: parseInt(numericId, 10),
