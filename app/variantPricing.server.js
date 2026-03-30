@@ -359,6 +359,28 @@ export async function getOrCreateVariant(admin, productGid, price) {
   }
 
   // ── 5. Create new variant ──────────────────────────────────────────────────
+  // Re-fetch current options in case they changed since step 1 (e.g. "Price" option
+  // was just created in step 3 but autoCreated path didn't return).
+  const freshOptionsRes = await admin.graphql(GET_VARIANTS_QUERY, {
+    variables: { id: productGid },
+  });
+  const freshOptionsJson = await freshOptionsRes.json();
+  const freshOptions = freshOptionsJson.data?.product?.options ?? options;
+
+  // Build optionValues for ALL options on the product.
+  // For "Price", use the price string. For any other option (e.g. "Title"), use its
+  // first existing value so the combination is valid and unique.
+  const allOptionValues = freshOptions.map((opt) => {
+    if (opt.name.toLowerCase() === CARRIER_OPTION_NAME.toLowerCase()) {
+      return { name: priceStr, optionName: opt.name };
+    }
+    return { name: opt.values?.[0] ?? "Default", optionName: opt.name };
+  });
+  // Guard: if "Price" option wasn't in the fetched list, add it explicitly.
+  if (!allOptionValues.some((o) => o.optionName.toLowerCase() === CARRIER_OPTION_NAME.toLowerCase())) {
+    allOptionValues.push({ name: priceStr, optionName: CARRIER_OPTION_NAME });
+  }
+
   const createRes = await admin.graphql(CREATE_VARIANT_MUTATION, {
     variables: {
       productId: productGid,
@@ -366,7 +388,7 @@ export async function getOrCreateVariant(admin, productGid, price) {
         {
           price: priceStr,
           inventoryPolicy: "CONTINUE",
-          optionValues: [{ name: priceStr, optionName: CARRIER_OPTION_NAME }],
+          optionValues: allOptionValues,
         },
       ],
     },
@@ -444,18 +466,19 @@ export async function getOrCreateVariant(admin, productGid, price) {
  * can fire-and-forget without risking webhook timeouts.
  *
  * @param {object} admin
- * @param {string} variantGid - e.g. "gid://shopify/ProductVariant/123"
+ * @param {string} variantGid  - e.g. "gid://shopify/ProductVariant/123"
+ * @param {string} [productGid] - product that owns the variant; falls back to CUSTOM_PRODUCT_ID
  */
-export async function deleteVariant(admin, variantGid) {
-  const productGid = process.env.CUSTOM_PRODUCT_ID;
-  if (!productGid) {
-    console.error("[variantPricing] deleteVariant: CUSTOM_PRODUCT_ID not set");
+export async function deleteVariant(admin, variantGid, productGid) {
+  const resolvedProductGid = productGid || process.env.CUSTOM_PRODUCT_ID;
+  if (!resolvedProductGid) {
+    console.error("[variantPricing] deleteVariant: no product GID available");
     return;
   }
 
   try {
     const res = await admin.graphql(DELETE_VARIANTS_MUTATION, {
-      variables: { productId: productGid, variantsIds: [variantGid] },
+      variables: { productId: resolvedProductGid, variantsIds: [variantGid] },
     });
     const data = await res.json();
     const errs = data?.data?.productVariantsBulkDelete?.userErrors ?? [];

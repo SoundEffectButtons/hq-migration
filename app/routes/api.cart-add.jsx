@@ -41,7 +41,15 @@
 import { authenticate } from "../shopify.server";
 import { calculateUnitPrice, getOrCreateVariant } from "../variantPricing.server";
 
-const CUSTOM_PRODUCT_ID = process.env.CUSTOM_PRODUCT_ID;
+const FALLBACK_PRODUCT_ID = process.env.CUSTOM_PRODUCT_ID;
+
+/** Build a product GID from a raw productId string (numeric or full GID). */
+function toProductGid(rawId) {
+  if (!rawId || rawId === "undefined") return null;
+  const s = String(rawId).trim();
+  if (!s) return null;
+  return s.startsWith("gid://") ? s : `gid://shopify/Product/${s}`;
+}
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -54,6 +62,10 @@ const json = (data, status = 200) =>
 
 // Handle CORS preflight
 export const loader = async ({ request }) => {
+  console.log("[api.cart-add] loader hit", {
+    method: request.method,
+    url: request.url,
+  });
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -68,6 +80,10 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
+  console.log("[api.cart-add] action hit", {
+    method: request.method,
+    url: request.url,
+  });
   const ctx = await authenticate.public.appProxy(request);
   const admin = ctx.admin;
   if (!admin) {
@@ -76,10 +92,6 @@ export const action = async ({ request }) => {
   }
 
   try {
-    if (!CUSTOM_PRODUCT_ID) {
-      console.error("[api.cart-add] CUSTOM_PRODUCT_ID env var is not set");
-      return json({ error: "Pricing not configured" }, 500);
-    }
 
     // ── Parse input (JSON or form-encoded) ────────────────────────────────────
     let width;
@@ -135,13 +147,20 @@ export const action = async ({ request }) => {
       }
     }
 
+    // ── Resolve carrier product GID ───────────────────────────────────────────
+    // Use the storefront product the extension is on (sent as productId).
+    // Fall back to CUSTOM_PRODUCT_ID env var if not provided (legacy / multi-store).
+    const carrierProductGid = toProductGid(productId) || FALLBACK_PRODUCT_ID;
+    if (!carrierProductGid) {
+      console.error("[api.cart-add] No carrier product available (set CUSTOM_PRODUCT_ID or ensure productId is passed)");
+      return json({ error: "Pricing not configured" }, 500);
+    }
+
     // ── Resolve display name: use productTitle from request, else fetch by productId ─
     let displayProductName = productTitle;
-    if (!displayProductName && productId && productId !== "undefined") {
+    if (!displayProductName && carrierProductGid) {
       try {
-        const productGid = productId.startsWith("gid://")
-          ? productId
-          : `gid://shopify/Product/${productId}`;
+        const productGid = carrierProductGid;
         const res = await admin.graphql(
           `query getProductTitle($id: ID!) { product(id: $id) { title } }`,
           { variables: { id: productGid } },
@@ -212,7 +231,7 @@ export const action = async ({ request }) => {
 
       let numericId;
       try {
-        const result = await getOrCreateVariant(admin, CUSTOM_PRODUCT_ID, unitPrice);
+        const result = await getOrCreateVariant(admin, carrierProductGid, unitPrice);
         numericId = result.numericId;
       } catch (err) {
         console.error("[api.cart-add] getOrCreateVariant failed:", err);
@@ -243,6 +262,9 @@ export const action = async ({ request }) => {
         properties["Image URL"] = customImage;
       }
       if (displayProductName) properties.Product = displayProductName;
+      // Hidden property (prefixed _) so webhook knows which product GID to clean up.
+      // Shopify hides _ properties from customer-facing confirmation emails.
+      properties._ProductGid = carrierProductGid;
 
       items.push({
         id: parseInt(numericId, 10),

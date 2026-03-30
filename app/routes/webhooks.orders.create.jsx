@@ -15,9 +15,8 @@ import { postOrderMetafield } from "../orderMetafieldApi.server";
 import { buildLineItemsAndImages, getOrderId } from "../orderPayload.server";
 import { deleteVariant } from "../variantPricing.server";
 
-// Numeric product ID extracted from the GID env var at startup.
-// e.g. "gid://shopify/Product/7918491762736" → "7918491762736"
-const CARRIER_NUMERIC_ID = (process.env.CUSTOM_PRODUCT_ID ?? "")
+// Fallback numeric product ID from env (used for orders placed before the per-product migration).
+const FALLBACK_CARRIER_NUMERIC_ID = (process.env.CUSTOM_PRODUCT_ID ?? "")
   .split("/")
   .pop();
 
@@ -65,16 +64,36 @@ export const action = async ({ request }) => {
   }
 
   // ── 2. Delete dynamic pricing variants (fire-and-forget) ──────────────────
-  if (CARRIER_NUMERIC_ID && admin) {
-    const carrierLines = (order.line_items ?? []).filter(
-      (line) => String(line.product_id) === CARRIER_NUMERIC_ID,
-    );
-
-    for (const line of carrierLines) {
+  // For each line item, determine the product GID two ways:
+  //   a) _ProductGid hidden property set at cart-add time (new flow — uses actual product)
+  //   b) Fallback: match FALLBACK_CARRIER_NUMERIC_ID (old carrier product, legacy orders)
+  if (admin) {
+    for (const line of order.line_items ?? []) {
       if (!line.variant_id) continue;
+
+      // Try to read _ProductGid from cart line properties
+      const props = Array.isArray(line.properties) ? line.properties : [];
+      const productGidProp = props.find(
+        (p) => (p.name || p.key || "") === "_ProductGid",
+      );
+      const productGid = productGidProp?.value?.trim() || null;
+
+      // Fallback: if this line belongs to the old separate carrier product
+      const isFallbackCarrier =
+        !productGid &&
+        FALLBACK_CARRIER_NUMERIC_ID &&
+        String(line.product_id) === FALLBACK_CARRIER_NUMERIC_ID;
+
+      const resolvedProductGid =
+        productGid ||
+        (isFallbackCarrier
+          ? `gid://shopify/Product/${FALLBACK_CARRIER_NUMERIC_ID}`
+          : null);
+
+      if (!resolvedProductGid) continue;
+
       const variantGid = `gid://shopify/ProductVariant/${line.variant_id}`;
-      // deleteVariant() catches all errors internally — safe to await sequentially
-      await deleteVariant(admin, variantGid);
+      await deleteVariant(admin, variantGid, resolvedProductGid);
     }
   }
 
