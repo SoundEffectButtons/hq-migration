@@ -1,0 +1,11 @@
+{
+  "name": "checkout-line-item-title",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "@shopify/ui-extensions": "^2024.10.0"
+  },
+  "devDependencies": {
+    "@shopify/cli": "^3.91.0"
+  }
+}
