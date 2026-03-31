@@ -21,11 +21,15 @@ const PRICE_PER_SQIN = 0.0416;
 const PRECUT_FEE = 0.24;
 
 const DISCOUNT_TIERS = [
-  { minQty: 1, maxQty: 14, discount: 0 },
-  { minQty: 15, maxQty: 49, discount: 0.2 },
-  { minQty: 50, maxQty: 99, discount: 0.3 },
-  { minQty: 100, maxQty: 249, discount: 0.4 },
-  { minQty: 250, maxQty: Infinity, discount: 0.5 },
+  { minSubtotal: 0, discount: 0 },
+  { minSubtotal: 49, discount: 0.1 },
+  { minSubtotal: 99, discount: 0.15 },
+  { minSubtotal: 150, discount: 0.2 },
+  { minSubtotal: 250, discount: 0.3 },
+  { minSubtotal: 500, discount: 0.4 },
+  { minSubtotal: 1000, discount: 0.5 },
+  { minSubtotal: 1750, discount: 0.6 },
+  { minSubtotal: 3800, discount: 0.65 },
 ];
 
 // ─── Variant pool limits ──────────────────────────────────────────────────────
@@ -121,27 +125,36 @@ const DELETE_VARIANTS_MUTATION = `#graphql
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Calculate the final unit price after area formula and volume discount.
+ * Calculate the final unit price after area formula and discount rate.
  *
  * Formula:  unitPrice = (width × height × 0.0416) + (preCut ? 0.24 : 0)
- *           discounted = unitPrice × (1 − tier.discount)   [tier from quantity]
+ *           discounted = unitPrice × (1 − discountRate)
  *
  * @param {number}  width    - inches
  * @param {number}  height   - inches
  * @param {boolean} preCut   - whether pre-cut service is requested
- * @param {number}  quantity - used to select the volume-discount tier
+ * @param {number}  discountRate - decimal discount value (e.g. 0.2)
  * @returns {number} unit price rounded to 2 decimal places
  */
-export function calculateUnitPrice(width, height, preCut, quantity) {
+export function calculateUnitPrice(width, height, preCut, discountRate = 0) {
   const areaPrice = width * height * PRICE_PER_SQIN;
   const precutFee = preCut ? PRECUT_FEE : 0;
   const rawUnit = areaPrice + precutFee;
+  return parseFloat((rawUnit * (1 - discountRate)).toFixed(2));
+}
 
-  const tier =
-    DISCOUNT_TIERS.find((t) => quantity >= t.minQty && quantity <= t.maxQty) ??
-    DISCOUNT_TIERS[0];
-
-  return parseFloat((rawUnit * (1 - tier.discount)).toFixed(2));
+/**
+ * Resolve discount rate using order subtotal thresholds.
+ *
+ * @param {number} subtotal - pre-discount order subtotal
+ * @returns {number} decimal discount value (e.g. 0.3)
+ */
+export function getDiscountRateBySubtotal(subtotal = 0) {
+  const tier = DISCOUNT_TIERS.reduce((applied, candidate) => {
+    if (subtotal >= candidate.minSubtotal) return candidate;
+    return applied;
+  }, DISCOUNT_TIERS[0]);
+  return tier.discount;
 }
 
 /**

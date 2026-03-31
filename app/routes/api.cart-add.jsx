@@ -39,7 +39,11 @@
  */
 
 import { authenticate } from "../shopify.server";
-import { calculateUnitPrice, getOrCreateVariant } from "../variantPricing.server";
+import {
+  calculateUnitPrice,
+  getDiscountRateBySubtotal,
+  getOrCreateVariant,
+} from "../variantPricing.server";
 
 const FALLBACK_PRODUCT_ID = process.env.CUSTOM_PRODUCT_ID;
 
@@ -221,12 +225,23 @@ export const action = async ({ request }) => {
       1,
       parseInt(totalQty, 10) || normalizedLines.reduce((sum, line) => sum + line.quantity, 0),
     );
+    const rawSubtotal = normalizedLines.reduce(
+      (sum, line) =>
+        sum + calculateUnitPrice(line.width, line.height, line.preCut, 0) * line.quantity,
+      0,
+    );
+    const discountRate = getDiscountRateBySubtotal(rawSubtotal);
 
     const items = [];
     for (const line of normalizedLines) {
-      const unitPrice = calculateUnitPrice(line.width, line.height, line.preCut, globalQty);
+      const unitPrice = calculateUnitPrice(
+        line.width,
+        line.height,
+        line.preCut,
+        discountRate,
+      );
       console.log(
-        `[api.cart-add] line price=${unitPrice} width=${line.width} height=${line.height} preCut=${line.preCut} lineQty=${line.quantity} totalQty=${globalQty} placement=${line.placementId || "n/a"} size=${line.sizeId || "n/a"}`,
+        `[api.cart-add] line price=${unitPrice} width=${line.width} height=${line.height} preCut=${line.preCut} lineQty=${line.quantity} totalQty=${globalQty} subtotal=${rawSubtotal.toFixed(2)} discountRate=${discountRate} placement=${line.placementId || "n/a"} size=${line.sizeId || "n/a"}`,
       );
 
       let numericId;
@@ -252,6 +267,9 @@ export const action = async ({ request }) => {
         Dimensions: `${line.width}" x ${line.height}"`,
         PreCut: line.preCut ? "Yes" : "No",
       };
+      if (discountRate > 0) {
+        properties["Volume Discount"] = `${(discountRate * 100).toFixed(0)}% off applied`;
+      }
       if (line.placementLabel) properties.Placement = line.placementLabel;
       if (line.sizeLabel) properties.Size = line.sizeLabel;
       if (!line.sizeLabel) properties.Size = "Custom";
