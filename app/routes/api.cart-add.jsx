@@ -267,6 +267,9 @@ export const action = async ({ request }) => {
         Dimensions: `${line.width}" x ${line.height}"`,
         PreCut: line.preCut ? "Yes" : "No",
       };
+      if (discountRate > 0) {
+        properties["Volume Discount"] = `${(discountRate * 100).toFixed(0)}% off applied`;
+      }
       if (line.placementLabel) properties.Placement = line.placementLabel;
       if (line.sizeLabel) properties.Size = line.sizeLabel;
       if (!line.sizeLabel) properties.Size = "Custom";
