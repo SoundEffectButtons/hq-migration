@@ -26,7 +26,7 @@ api_version = "2025-01"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_orders,read_products,write_products"
+scopes = "read_orders,read_products,write_products,read_discounts,write_discounts"
 
 [auth]
 redirect_urls = [ "https://highquality.allgovjobs.com/backend/auth/callback" ]
